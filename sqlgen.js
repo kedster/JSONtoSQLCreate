@@ -163,7 +163,8 @@ document.getElementById('generateBtn').addEventListener('click', () => {
     renderSchemaTabs(sqlStatements);
     if (window.renderERD) window.renderERD(schema);
   } catch (e) {
-    document.getElementById('sqlOutput').value = 'Invalid JSON: ' + e.message;
+    document.getElementById('sqlOutput').value =
+      'Invalid JSON: ' + e.message + '\n\nTip: Ensure all property names and string values use double quotes and there are no trailing commas.';
   }
 });
 
@@ -191,6 +192,12 @@ function generateInsertStatements(tableName, columns, dataRows) {
 }
 
 function sanitizeJSON(input) {
+  // Remove BOM if present
+  input = input.replace(/^\uFEFF/, '');
   // Remove trailing commas before } or ]
-  return input.replace(/,\s*([\]}])/g, '$1');
+  input = input.replace(/,\s*([\]}])/g, '$1');
+  // Optionally, normalize non-standard quotes (replace smart quotes with standard quotes)
+  input = input.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+               .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+  return input;
 }
