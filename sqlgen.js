@@ -25,46 +25,42 @@ function inferSQLType(value) {
 // Replace inferType with inferSQLType in detectTables and use column objects
 function detectTables(data, parentTable = 'root') {
   const tables = {};
-  const queue = [{ item: data, tableName: parentTable, parentKey: null }];
+  const tableDataMap = {};
+  const queue = [{ item: data, tableName: parentTable, parentId: null }];
 
   while (queue.length) {
-    const { item, tableName, parentKey } = queue.shift();
+    const { item, tableName, parentId } = queue.shift();
 
     if (!tables[tableName]) tables[tableName] = { columns: {}, fks: [], pks: ['id'] };
+    if (!tableDataMap[tableName]) tableDataMap[tableName] = [];
 
     if (Array.isArray(item)) {
-      item.forEach(entry => queue.push({ item: entry, tableName, parentKey }));
+      item.forEach(entry => queue.push({ item: entry, tableName, parentId }));
     } else if (typeof item === 'object' && item !== null) {
+      const row = {};
       for (const key in item) {
         if (!item.hasOwnProperty(key)) continue;
         const value = item[key];
 
         if (Array.isArray(value)) {
           const childTable = `${tableName}_${key}`;
-          tables[childTable] = tables[childTable] || { columns: {}, fks: [], pks: ['id'] };
-          tables[childTable].columns[`${tableName}_id`] = { type: 'INTEGER', required: false };
-          tables[childTable].fks.push({ col: `${tableName}_id`, ref: `${tableName}(id)` });
-          queue.push({ item: value, tableName: childTable, parentKey: `${tableName}_id` });
+          queue.push({ item: value, tableName: childTable, parentId: null });
         } else if (typeof value === 'object' && value !== null) {
           const childTable = `${tableName}_${key}`;
-          tables[childTable] = tables[childTable] || { columns: {}, fks: [], pks: ['id'] };
-          tables[childTable].columns[`${tableName}_id`] = { type: 'INTEGER', required: false };
-          tables[childTable].fks.push({ col: `${tableName}_id`, ref: `${tableName}(id)` });
-          queue.push({ item: value, tableName: childTable, parentKey: `${tableName}_id` });
+          queue.push({ item: value, tableName: childTable, parentId: null });
         } else {
-          // Use inferSQLType and column object
-          if (!tables[tableName].columns[key]) {
-            tables[tableName].columns[key] = {
-              type: inferSQLType(value),
-              required: false // Could be set to true if always present
-            };
-          }
+          tables[tableName].columns[key] = {
+            type: inferSQLType(value),
+            required: false
+          };
+          row[key] = value;
         }
       }
+      tableDataMap[tableName].push(row);
     }
   }
 
-  return tables;
+  return { schema: tables, data: tableDataMap };
 }
 
 // Update generateSQL to use new column object structure
@@ -142,7 +138,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   const input = document.getElementById('jsonInput').value;
   try {
     const json = JSON.parse(input);
-    const schema = generateRelationalSchema(json);
+    const { schema, data } = generateRelationalSchema(json);
     let fullSQL = '';
     const sqlStatements = {};
 
@@ -152,12 +148,12 @@ document.getElementById('generateBtn').addEventListener('click', () => {
       sqlStatements[tableName] = createSQL;
       fullSQL += createSQL + '\n';
 
-      // If data exists for this table in the JSON, generate INSERTs
-      if (json[tableName] && Array.isArray(json[tableName])) {
+      // Use collected data for INSERTs
+      if (data[tableName] && data[tableName].length > 0) {
         fullSQL += generateInsertStatements(
           tableName,
           schema[tableName].columns,
-          json[tableName]
+          data[tableName]
         ) + '\n';
       }
     }
