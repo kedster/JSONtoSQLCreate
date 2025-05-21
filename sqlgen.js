@@ -137,7 +137,8 @@ function renderSchemaTabs(sqlStatements) {
 document.getElementById('generateBtn').addEventListener('click', () => {
   const input = document.getElementById('jsonInput').value;
   try {
-    const json = JSON.parse(input);
+    const sanitized = sanitizeJSON(input);
+    const json = JSON.parse(sanitized);
     const { schema, data } = generateRelationalSchema(json);
     let fullSQL = '';
     const sqlStatements = {};
@@ -187,4 +188,9 @@ function generateInsertStatements(tableName, columns, dataRows) {
     sql += `INSERT INTO ${tableName} (${colNames.join(', ')}) VALUES (${values.join(', ')});\n`;
   });
   return sql;
+}
+
+function sanitizeJSON(input) {
+  // Remove trailing commas before } or ]
+  return input.replace(/,\s*([\]}])/g, '$1');
 }
