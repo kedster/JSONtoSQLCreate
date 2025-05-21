@@ -1,51 +1,61 @@
+// Safer object key handling for flattenJSON
 function flattenJSON(obj, parentKey = '', res = {}) {
   for (const key in obj) {
-    if (!obj.hasOwnProperty(key)) continue;
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
     const propName = parentKey ? `${parentKey}_${key}` : key;
-    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-      flattenJSON(obj[key], propName, res);
+    const val = obj[key];
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      flattenJSON(val, propName, res);
     } else {
-      res[propName] = obj[key];
+      res[propName] = val;
     }
   }
   return res;
 }
 
+// Improved type detection for inferSQLType
 function inferSQLType(value) {
   if (typeof value === 'boolean') return 'BOOLEAN';
   if (typeof value === 'number') return Number.isInteger(value) ? 'INTEGER' : 'REAL';
+
   if (typeof value === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'DATE';
-    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return 'DATETIME';
-    return 'TEXT';
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) return 'INTEGER';
+    if (/^\d+\.\d+$/.test(trimmed)) return 'REAL';
+    if (/^\d{4}-\d{2}-\d{2}([ T]|\b)/.test(trimmed)) return trimmed.includes('T') ? 'DATETIME' : 'DATE';
   }
+
   return 'TEXT'; // fallback
 }
 
 // Replace inferType with inferSQLType in detectTables and use column objects
-function detectTables(data, parentTable = 'root') {
+function detectTables(data, parentTable = 'root', parentKey = null) {
   const tables = {};
   const tableDataMap = {};
-  const queue = [{ item: data, tableName: parentTable, parentId: null }];
+  const queue = [{ item: data, tableName: parentTable, parentId: parentKey }];
 
-  while (queue.length) {
+  while (queue.length > 0) {
     const { item, tableName, parentId } = queue.shift();
-
-    if (!tables[tableName]) tables[tableName] = { columns: {}, fks: [], pks: ['id'] };
+    if (!tables[tableName]) {
+      tables[tableName] = { columns: {}, fks: [], pks: ['id'] };
+    }
     if (!tableDataMap[tableName]) tableDataMap[tableName] = [];
 
     if (Array.isArray(item)) {
       item.forEach(entry => queue.push({ item: entry, tableName, parentId }));
     } else if (typeof item === 'object' && item !== null) {
       const row = {};
+      if (parentId !== null) row.parent_id = parentId;
+      if (parentId !== null && !tables[tableName].columns['parent_id']) {
+        tables[tableName].columns['parent_id'] = { type: 'INTEGER', required: false };
+        tables[tableName].fks.push({ col: 'parent_id', ref: parentTable });
+      }
+
       for (const key in item) {
-        if (!item.hasOwnProperty(key)) continue;
+        if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
         const value = item[key];
 
-        if (Array.isArray(value)) {
-          const childTable = `${tableName}_${key}`;
-          queue.push({ item: value, tableName: childTable, parentId: null });
-        } else if (typeof value === 'object' && value !== null) {
+        if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
           const childTable = `${tableName}_${key}`;
           queue.push({ item: value, tableName: childTable, parentId: null });
         } else {
@@ -56,6 +66,7 @@ function detectTables(data, parentTable = 'root') {
           row[key] = value;
         }
       }
+
       tableDataMap[tableName].push(row);
     }
   }
@@ -63,22 +74,22 @@ function detectTables(data, parentTable = 'root') {
   return { schema: tables, data: tableDataMap };
 }
 
-// Update generateSQL to use new column object structure
+// Updated generateSQL: escapes table/column names for safety
 function generateSQL(schema) {
   let sql = '';
   for (const tableName in schema) {
     const table = schema[tableName];
-    sql += `CREATE TABLE ${tableName} (\n`;
-    const columns = [`  id INTEGER PRIMARY KEY AUTOINCREMENT`];
+    sql += `CREATE TABLE "${tableName}" (\n`;
+    const columns = [`  "id" INTEGER PRIMARY KEY AUTOINCREMENT`];
 
     for (const col in table.columns) {
-      if (col === 'id') continue; // already handled
+      if (col === 'id') continue;
       const colDef = table.columns[col];
-      columns.push(`  ${col} ${colDef.type}`);
+      columns.push(`  "${col}" ${colDef.type}`);
     }
 
     table.fks.forEach(fk => {
-      columns.push(`  FOREIGN KEY (${fk.col}) REFERENCES ${fk.ref}`);
+      columns.push(`  FOREIGN KEY ("${fk.col}") REFERENCES "${fk.ref}"("id")`);
     });
 
     sql += columns.join(',\n') + '\n);\n\n';
@@ -136,13 +147,21 @@ function renderSchemaTabs(sqlStatements) {
 
 document.getElementById('generateBtn').addEventListener('click', () => {
   let input = document.getElementById('jsonInput').value;
+  // NDJSON support
+  if (isNDJSON(input)) {
+    input = ndjsonToJSONArray(input);
+  }
+  const { json, error } = parseAnyJSON(input);
+  if (error) {
+    document.getElementById('sqlOutput').value =
+      'Invalid JSON: ' + error + '\n\nTip: Paste standard JSON, NDJSON, or JSON-like data (loose JSON).';
+    return;
+  }
+  if (!json || (typeof json !== 'object' && !Array.isArray(json))) {
+    document.getElementById('sqlOutput').value = 'Input is not a valid JSON object or array.';
+    return;
+  }
   try {
-    // Detect NDJSON: if first non-whitespace char is { and there are multiple lines
-    if (/^\s*{/.test(input) && input.split('\n').length > 1) {
-      input = ndjsonToJSONArray(input);
-    }
-    const sanitized = sanitizeJSON(input);
-    const json = JSON.parse(sanitized);
     const { schema, data } = generateRelationalSchema(json);
     let fullSQL = '';
     const sqlStatements = {};
@@ -165,7 +184,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
     if (window.renderERD) window.renderERD(schema);
   } catch (e) {
     document.getElementById('sqlOutput').value =
-      'Invalid JSON: ' + e.message + '\n\nTip: Paste standard JSON, or NDJSON (one object per line).';
+      'Error processing data: ' + e.message;
   }
 });
 
@@ -179,16 +198,17 @@ function generateInsertStatements(tableName, columns, dataRows) {
   if (!Array.isArray(dataRows) || dataRows.length === 0) return '';
   const colNames = Object.keys(columns);
   let sql = '';
+
   dataRows.forEach(row => {
-    const values = colNames.map(col =>
-      row[col] === null || row[col] === undefined
-        ? 'NULL'
-        : typeof row[col] === 'string'
-          ? `'${row[col].replace(/'/g, "''")}'`
-          : row[col]
-    );
-    sql += `INSERT INTO ${tableName} (${colNames.join(', ')}) VALUES (${values.join(', ')});\n`;
+    const values = colNames.map(col => {
+      const val = row[col];
+      if (val === null || val === undefined) return 'NULL';
+      if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+      return val;
+    });
+    sql += `INSERT INTO "${tableName}" (${colNames.map(c => `"${c}"`).join(', ')}) VALUES (${values.join(', ')});\n`;
   });
+
   return sql;
 }
 
@@ -210,4 +230,34 @@ function ndjsonToJSONArray(input) {
     .map(line => line.trim())
     .filter(line => line.length > 0);
   return `[${lines.join(',')}]`;
+}
+
+function fixLooseJSON(input) {
+  return input
+    .replace(/([\{\[,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":') // wrap unquoted keys
+    .replace(/'([^']+)'/g, '"$1"') // convert single to double quotes
+    .replace(/,\s*([}\]])/g, '$1'); // remove trailing commas
+}
+
+function isNDJSON(input) {
+  // At least two lines, each line is a JSON object or array
+  const lines = input.split('\n').map(l => l.trim()).filter(Boolean);
+  return lines.length > 1 && lines.every(line => line.startsWith('{') || line.startsWith('['));
+}
+
+function parseAnyJSON(input) {
+  // Try strict JSON first
+  try {
+    return { json: JSON.parse(input), error: null };
+  } catch {}
+  // Try sanitizing
+  try {
+    return { json: JSON.parse(sanitizeJSON(input)), error: null };
+  } catch {}
+  // Try fixing loose JSON
+  try {
+    return { json: JSON.parse(fixLooseJSON(input)), error: null };
+  } catch (e) {
+    return { json: null, error: e.message };
+  }
 }
