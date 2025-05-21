@@ -135,21 +135,22 @@ function renderSchemaTabs(sqlStatements) {
 // Event listeners for UI
 
 document.getElementById('generateBtn').addEventListener('click', () => {
-  const input = document.getElementById('jsonInput').value;
+  let input = document.getElementById('jsonInput').value;
   try {
+    // Detect NDJSON: if first non-whitespace char is { and there are multiple lines
+    if (/^\s*{/.test(input) && input.split('\n').length > 1) {
+      input = ndjsonToJSONArray(input);
+    }
     const sanitized = sanitizeJSON(input);
     const json = JSON.parse(sanitized);
     const { schema, data } = generateRelationalSchema(json);
     let fullSQL = '';
     const sqlStatements = {};
 
-    // Generate CREATE TABLE and INSERT statements for each table
     for (const tableName in schema) {
       const createSQL = generateSQL({ [tableName]: schema[tableName] });
       sqlStatements[tableName] = createSQL;
       fullSQL += createSQL + '\n';
-
-      // Use collected data for INSERTs
       if (data[tableName] && data[tableName].length > 0) {
         fullSQL += generateInsertStatements(
           tableName,
@@ -164,7 +165,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
     if (window.renderERD) window.renderERD(schema);
   } catch (e) {
     document.getElementById('sqlOutput').value =
-      'Invalid JSON: ' + e.message + '\n\nTip: Ensure all property names and string values use double quotes and there are no trailing commas.';
+      'Invalid JSON: ' + e.message + '\n\nTip: Paste standard JSON, or NDJSON (one object per line).';
   }
 });
 
@@ -200,4 +201,13 @@ function sanitizeJSON(input) {
   input = input.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
                .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
   return input;
+}
+
+function ndjsonToJSONArray(input) {
+  // Remove empty lines, trim, and wrap in []
+  const lines = input
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+  return `[${lines.join(',')}]`;
 }
