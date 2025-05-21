@@ -143,14 +143,26 @@ document.getElementById('generateBtn').addEventListener('click', () => {
   try {
     const json = JSON.parse(input);
     const schema = generateRelationalSchema(json);
-    const sql = generateSQL(schema);
-    document.getElementById('sqlOutput').value = sql;
-
-    // After generating schema and sql
+    let fullSQL = '';
     const sqlStatements = {};
+
+    // Generate CREATE TABLE and INSERT statements for each table
     for (const tableName in schema) {
-      sqlStatements[tableName] = generateSQL({ [tableName]: schema[tableName] });
+      const createSQL = generateSQL({ [tableName]: schema[tableName] });
+      sqlStatements[tableName] = createSQL;
+      fullSQL += createSQL + '\n';
+
+      // If data exists for this table in the JSON, generate INSERTs
+      if (json[tableName] && Array.isArray(json[tableName])) {
+        fullSQL += generateInsertStatements(
+          tableName,
+          schema[tableName].columns,
+          json[tableName]
+        ) + '\n';
+      }
     }
+
+    document.getElementById('sqlOutput').value = fullSQL.trim();
     renderSchemaTabs(sqlStatements);
     if (window.renderERD) window.renderERD(schema);
   } catch (e) {
@@ -163,3 +175,20 @@ document.getElementById('copyBtn').addEventListener('click', () => {
   output.select();
   document.execCommand('copy');
 });
+
+function generateInsertStatements(tableName, columns, dataRows) {
+  if (!Array.isArray(dataRows) || dataRows.length === 0) return '';
+  const colNames = Object.keys(columns);
+  let sql = '';
+  dataRows.forEach(row => {
+    const values = colNames.map(col =>
+      row[col] === null || row[col] === undefined
+        ? 'NULL'
+        : typeof row[col] === 'string'
+          ? `'${row[col].replace(/'/g, "''")}'`
+          : row[col]
+    );
+    sql += `INSERT INTO ${tableName} (${colNames.join(', ')}) VALUES (${values.join(', ')});\n`;
+  });
+  return sql;
+}
