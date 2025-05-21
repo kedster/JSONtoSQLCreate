@@ -240,10 +240,24 @@ function ndjsonToJSONArray(input) {
 }
 
 function fixLooseJSON(input) {
-  return input
-    .replace(/([\{\[,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":') // wrap unquoted keys
-    .replace(/'([^']+)'/g, '"$1"') // convert single to double quotes
-    .replace(/,\s*([}\]])/g, '$1'); // remove trailing commas
+  // Trim whitespace first
+  input = input.trim();
+
+  // If input looks like multiple objects without enclosing []
+  if (!input.startsWith('[') && input.includes('},') && input.includes('{')) {
+    input = `[${input}]`;
+  }
+
+  // Wrap unquoted keys with double quotes
+  input = input.replace(/([\{\[,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+
+  // Convert single quotes to double quotes
+  input = input.replace(/'([^']*)'/g, '"$1"');
+
+  // Remove trailing commas before } or ]
+  input = input.replace(/,\s*([\}\]])/g, '$1');
+
+  return input;
 }
 
 function parseAnyJSON(input) {
