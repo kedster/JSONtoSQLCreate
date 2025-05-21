@@ -223,12 +223,19 @@ function sanitizeJSON(input) {
   return input;
 }
 
+function isNDJSON(input) {
+  const lines = input.split('\n')
+    .map(l => l.trim())
+    .filter(line => line && !line.startsWith('//') && !line.startsWith('#'));
+  const validLines = lines.filter(line => line.startsWith('{') || line.startsWith('['));
+  return lines.length > 1 && validLines.length / lines.length > 0.8;
+}
+
 function ndjsonToJSONArray(input) {
-  // Remove empty lines, trim, and wrap in []
   const lines = input
     .split('\n')
     .map(line => line.trim())
-    .filter(line => line.length > 0);
+    .filter(line => line && !line.startsWith('//') && !line.startsWith('#'));
   return `[${lines.join(',')}]`;
 }
 
@@ -237,12 +244,6 @@ function fixLooseJSON(input) {
     .replace(/([\{\[,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":') // wrap unquoted keys
     .replace(/'([^']+)'/g, '"$1"') // convert single to double quotes
     .replace(/,\s*([}\]])/g, '$1'); // remove trailing commas
-}
-
-function isNDJSON(input) {
-  // At least two lines, each line is a JSON object or array
-  const lines = input.split('\n').map(l => l.trim()).filter(Boolean);
-  return lines.length > 1 && lines.every(line => line.startsWith('{') || line.startsWith('['));
 }
 
 function parseAnyJSON(input) {
