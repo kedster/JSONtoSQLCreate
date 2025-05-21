@@ -113,60 +113,6 @@
       <p class="example-note">Trailing comma after the last key-value pair is invalid.</p>
     </section>
 
-    <section>
-      <h2>Loose JSON: Comments Inside JSON</h2>
-      <pre>{
-  "color": "yellow", // This is the color name
-  "value": "#ff0"    /* Hex color code */
-}</pre>
-      <p class="example-note">JSON does not support comments, but many "loose JSON" formats do.</p>
-    </section>
-
-    <section>
-      <h2>Loose JSON: Multiline Strings Without Quotes</h2>
-      <pre>{
-  color: red,
-  value: #f00
-}</pre>
-      <p class="example-note">Keys and string values missing quotes altogether.</p>
-    </section>
-
-    <section>
-      <h2>Loose JSON: Values as Barewords (Unquoted Strings)</h2>
-      <pre>{
-  color: red,
-  value: #f00
-}</pre>
-      <p class="example-note">Barewords (unquoted strings) instead of string literals.</p>
-    </section>
-
-    <section>
-      <h2>Loose JSON: Array Without Brackets</h2>
-      <pre>1, 2, 3, 4, 5</pre>
-      <p class="example-note">Not wrapped in array brackets ([]).</p>
-    </section>
-
-    <section>
-      <h2>Loose JSON: Multiple JSON Objects Without Wrapping Array</h2>
-      <pre>{
-  "color": "red", "value": "#f00"
-}
-{
-  "color": "blue", "value": "#00f"
-}</pre>
-      <p class="example-note">Multiple top-level objects without an enclosing array (like NDJSON but missing newline separators).</p>
-    </section>
-
-    <section>
-      <h2>Loose JSON: Mixed Use of Quotes</h2>
-      <pre>{
-  color: "red",
-  'value': '#f00',
-  "opacity": 0.5
-}</pre>
-      <p class="example-note">Inconsistent quoting style for keys and values.</p>
-    </section>
-
     <a href="index.html" class="button">Back to Tool</a>
   </div>
 </body>
