@@ -32,7 +32,7 @@ function inferSQLType(value) {
 function detectTables(data, parentTable = 'root', parentKey = null) {
   const tables = {};
   const tableDataMap = {};
-  const queue = [{ item: data, tableName: parentTable, parentId: parentKey }];
+  const queue = [{ item: data, tableName: parentTable, parentId: null }];
 
   while (queue.length > 0) {
     const { item, tableName, parentId } = queue.shift();
@@ -57,7 +57,8 @@ function detectTables(data, parentTable = 'root', parentKey = null) {
 
         if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
           const childTable = `${tableName}_${key}`;
-          queue.push({ item: value, tableName: childTable, parentId: null });
+          // Always pass the current table's name as parentTable and a placeholder parentId (e.g., 1)
+          queue.push({ item: value, tableName: childTable, parentId: 1 });
         } else {
           tables[tableName].columns[key] = {
             type: inferSQLType(value),
@@ -169,7 +170,7 @@ document.getElementById('generateBtn').addEventListener('click', () => {
     for (const tableName in schema) {
       const createSQL = generateSQL({ [tableName]: schema[tableName] });
       sqlStatements[tableName] = createSQL;
-      fullSQL += createSQL + '\n';
+      fullSQL += createSQL + '\n\n'; // <-- Add extra newline here
       if (data[tableName] && data[tableName].length > 0) {
         fullSQL += generateInsertStatements(
           tableName,
@@ -275,4 +276,24 @@ function parseAnyJSON(input) {
   } catch (e) {
     return { json: null, error: e.message };
   }
+}
+
+function renderERD(tables) {
+  let erd = 'erDiagram\n';
+  for (const [table, def] of Object.entries(tables)) {
+    erd += `  ${table} {\n`;
+    for (const colName in def.columns) {
+      erd += `    ${def.columns[colName].type} ${colName}\n`;
+    }
+    erd += '  }\n';
+  }
+  for (const [table, def] of Object.entries(tables)) {
+    if (def.fks) {
+      def.fks.forEach(fk => {
+        erd += `  ${fk.ref} ||--o{ ${table} : "parent_id"\n`;
+      });
+    }
+  }
+  document.getElementById('erdContainer').innerHTML = `<pre class="mermaid">${erd}</pre>`;
+  mermaid.run();
 }
