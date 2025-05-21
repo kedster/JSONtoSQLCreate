@@ -1,0 +1,13 @@
+{
+  "employees": [
+    { "id": 1,   "name": " ",   "dept_id": 2 },
+    { "id": 101, "name": "John",  "dept_id": 10 },
+    { "id": 102, "name": "Alice", "dept_id": 20 },
+    { "id": 103, "name": "Bob",   "dept_id": 10 }
+  ],
+  "schema": [
+    { "name": "id", "type": "int", "primary": true },
+    { "name": "name", "type": "varchar(255)" },
+    { "name": "dept_id", "type": "int", "foreign": { "references": "departments(id)" } }
+  ]
+}
