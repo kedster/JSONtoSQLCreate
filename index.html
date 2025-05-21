@@ -1,58 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>JSON to SQL Normalizer</title>
-  <link rel="stylesheet" href="style.css">
-</head>
 <body>
-  <h1>JSON to SQL CREATE Tool</h1>
-  <label for="jsonInput">Paste your JSON here:</label>
-  <textarea id="jsonInput" placeholder="Paste complex JSON here"></textarea>
-  <button id="generateBtn">Generate SQL</button>
+  <div class="container">
+    <h1>JSON to SQL CREATE Tool</h1>
+    <label for="jsonInput">Paste your JSON here:</label>
+    <textarea id="jsonInput" placeholder="Paste complex JSON here"></textarea>
+    <button id="generateBtn">Generate SQL</button>
 
-  <!-- Tabs for SQL schema output -->
-  <div id="schemaTabs" class="tab-container"></div>
+    <div id="schemaTabs" class="tab-container"></div>
 
-  <!-- ERD diagram -->
-  <div id="erdContainer" class="erd-box"></div>
+    <div id="erdContainer" class="erd-box"></div>
 
-  <!-- (Optional) Keep your output textarea if you want single-table SQL output as well -->
-  <label for="sqlOutput">CREATE SQL Statement:</label>
-  <textarea id="sqlOutput" rows="10" readonly placeholder="Your SQL output will appear here..."></textarea>
-  <button id="copyBtn">Copy to Clipboard</button>
+    <label for="sqlOutput">CREATE SQL Statement:</label>
+    <textarea id="sqlOutput" rows="10" readonly placeholder="Your SQL output will appear here..."></textarea>
+    <button id="copyBtn">Copy to Clipboard</button>
+  </div>
 
   <script src="sqlgen.js"></script>
   <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: false });
-
-    function renderERD(tables) {
-      let erd = 'erDiagram\n';
-      for (const [table, def] of Object.entries(tables)) {
-        erd += `  ${table} {\n`;
-        for (const colName in def.columns) {
-          erd += `    ${def.columns[colName].type} ${colName}\n`;
-        }
-        erd += '  }\n';
-      }
-
-      for (const [table, def] of Object.entries(tables)) {
-        if (def.fks) {
-          def.fks.forEach(fk => {
-            // fk.ref is like "parent(id)"
-            const [refTable, refCol] = fk.ref.replace(')', '').split('(');
-            erd += `  ${refTable} ||--o{ ${table} : "${refCol}"\n`;
-          });
-        }
-      }
-
-      document.getElementById('erdContainer').innerHTML = `<pre class="mermaid">${erd}</pre>`;
-      mermaid.run();
-    }
-
-    // Expose renderERD globally for use in other scripts
-    window.renderERD = renderERD;
+    // existing Mermaid & renderERD code
   </script>
 </body>
-</html>

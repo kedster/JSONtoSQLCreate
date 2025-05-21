@@ -1,6 +1,5 @@
 {
   "employees": [
-    { "id": 1,   "name": " ",   "dept_id": 2 },
     { "id": 101, "name": "John",  "dept_id": 10 },
     { "id": 102, "name": "Alice", "dept_id": 20 },
     { "id": 103, "name": "Bob",   "dept_id": 10 }
